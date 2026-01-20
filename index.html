@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Voice AI</title>
+    <style>
+        :root {
+            --bg-color: #050505;
+            --grid-color: rgba(56, 189, 248, 0.1);
+            --primary-color: #38bdf8; /* Cyan (Unlocked) */
+            --locked-color: #f59e0b; /* Orange/Gold (Locked) */
+            --listening-color: #ef4444; /* Red */
+            --speaking-color: #22c55e; /* Green */
+            --text-color: #f1f5f9;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg-color);
+            /* Futuristic Grid Background */
+            background-image: 
+                linear-gradient(var(--grid-color) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+            background-size: 40px 40px;
+            color: var(--text-color);
+            height: 100vh;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        /* --- The Orb Container --- */
+        .orb-container {
+            position: relative;
+            width: 220px;
+            height: 220px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            margin-bottom: 3rem;
+            transition: all 0.5s ease;
+        }
+
+        .orb {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, var(--locked-color), #b45309);
+            box-shadow: 0 0 60px var(--locked-color);
+            z-index: 2;
+            transition: all 0.8s ease;
+            position: relative;
+        }
+
+        /* Unlock State Styles */
+        body.unlocked .orb {
+            background: radial-gradient(circle at 30% 30%, var(--primary-color), var(--primary-color));
+            box-shadow: 0 0 60px var(--primary-color);
+        }
+
+        /* Listening Animation (Red) */
+        .orb-container.listening .orb {
+            background: var(--listening-color);
+            box-shadow: 0 0 70px var(--listening-color);
+            animation: pulse-red 1.5s infinite;
+        }
+
+        /* Speaking Animation (Green) */
+        .orb-container.speaking .orb {
+            background: var(--speaking-color);
+            box-shadow: 0 0 80px var(--speaking-color);
+            animation: pulse-green 0.8s infinite alternate;
+        }
+
+        /* Locked Pulse (Orange) */
+        .orb-container.locked-pulse .orb {
+            animation: pulse-locked 2s infinite ease-in-out;
+        }
+
+        @keyframes pulse-locked {
+            0%, 100% { box-shadow: 0 0 20px var(--locked-color); }
+            50% { box-shadow: 0 0 50px var(--locked-color); }
+        }
+
+        @keyframes pulse-red {
+            0% { transform: scale(1); opacity: 0.9; }
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 0.9; }
+        }
+
+        @keyframes pulse-green {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.2); }
+        }
+
+        /* --- Lock Icon --- */
+        .lock-icon {
+            position: absolute;
+            font-size: 3rem;
+            color: rgba(255,255,255,0.8);
+            z-index: 3;
+            transition: opacity 0.5s;
+            pointer-events: none;
+        }
+
+        body.unlocked .lock-icon {
+            opacity: 0;
+        }
+
+        /* --- Status Text --- */
+        #status-text {
+            font-size: 2rem;
+            font-weight: 600;
+            color: var(--locked-color);
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            text-align: center;
+            min-height: 3rem;
+            transition: color 0.5s;
+        }
+
+        body.unlocked #status-text {
+            color: var(--primary-color);
+        }
+
+        #instruction {
+            margin-top: 10px;
+            color: #64748b;
+            font-size: 1rem;
+            letter-spacing: 1px;
+        }
+
+        /* --- Start Overlay --- */
+        #start-screen {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            transition: opacity 0.8s;
+        }
+
+        button {
+            padding: 1rem 3rem;
+            font-size: 1.2rem;
+            background: transparent;
+            border: 2px solid var(--locked-color);
+            color: var(--locked-color);
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 1rem;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+
+        button:hover {
+            background: var(--locked-color);
+            color: #000;
+            box-shadow: 0 0 20px var(--locked-color);
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- Start Screen -->
+    <div id="start-screen">
+        <h1 style="color:white; letter-spacing: 5px;">SYSTEM LOCKED</h1>
+        <p style="color: #64748b; margin-top: 10px;">Authorization Required</p>
+        <button onclick="initAI()">Initialize</button>
+    </div>
+
+    <!-- Main Interface -->
+    <div class="orb-container locked-pulse" id="orb">
+        <div class="orb"></div>
+        <div class="lock-icon">🔒</div>
+    </div>
+
+    <div id="status-text">System Locked</div>
+    <div id="instruction">Tap orb to enter code</div>
+
+    <script>
+        // CONFIGURATION
+        const SECRET_CODE = "hadi";
+
+        // ELEMENTS
+        const orb = document.getElementById('orb');
+        const statusText = document.getElementById('status-text');
+        const instruction = document.getElementById('instruction');
+        const startScreen = document.getElementById('start-screen');
+        
+        // STATE
+        let recognition;
+        let synth = window.speechSynthesis;
+        let voices = [];
+        let isListening = false;
+        let isUnlocked = false;
+
+        // --- INIT ---
+        function initAI() {
+            startScreen.style.opacity = '0';
+            setTimeout(() => startScreen.style.display = 'none', 800);
+
+            populateVoices();
+            if (speechSynthesis.onvoiceschanged !== undefined) {
+                speechSynthesis.onvoiceschanged = populateVoices;
+            }
+
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (SpeechRecognition) {
+                recognition = new SpeechRecognition();
+                recognition.continuous = false;
+                recognition.lang = 'en-US';
+                recognition.interimResults = false;
+
+                recognition.onstart = () => {
+                    isListening = true;
+                    orb.classList.remove('locked-pulse');
+                    orb.classList.add('listening');
+                    orb.classList.remove('speaking');
+                    
+                    if(isUnlocked) {
+                        statusText.textContent = "Listening...";
+                        statusText.style.color = "var(--listening-color)";
+                        instruction.textContent = "Speak now";
+                    } else {
+                        statusText.textContent = "Awaiting Code...";
+                        statusText.style.color = "var(--listening-color)";
+                        instruction.textContent = "Say the secret word";
+                    }
+                };
+
+                recognition.onend = () => {
+                    isListening = false;
+                    orb.classList.remove('listening');
+                    
+                    if(!isUnlocked) {
+                        orb.classList.add('locked-pulse');
+                        statusText.textContent = "System Locked";
+                        statusText.style.color = "var(--locked-color)";
+                        instruction.textContent = "Tap orb to retry";
+                    } else {
+                        statusText.textContent = "Tap to Speak";
+                        statusText.style.color = "var(--primary-color)";
+                        instruction.textContent = "Waiting for input";
+                    }
+                };
+
+                recognition.onresult = (event) => {
+                    const transcript = event.results[0][0].transcript;
+                    processInput(transcript);
+                };
+
+                recognition.onerror = () => {
+                    isListening = false;
+                    orb.classList.remove('listening');
+                    if(!isUnlocked) orb.classList.add('locked-pulse');
+                };
+            } else {
+                alert("Speech API not supported.");
+            }
+
+            // CLICK INTERACTION
+            orb.addEventListener('click', () => {
+                // Stop speaking if clicked
+                if (synth.speaking) {
+                    synth.cancel();
+                    orb.classList.remove('speaking');
+                    return;
+                }
+                
+                // Start listening if idle
+                if (!isListening) {
+                    try { recognition.start(); } catch(e){}
+                }
+            });
+        }
+
+        // --- LOGIC ---
+        function processInput(input) {
+            if (!isUnlocked) {
+                // LOCKED STATE CHECK
+                if (input.toLowerCase().trim().includes(SECRET_CODE)) {
+                    unlockSystem();
+                } else {
+                    speak("Access Denied. Incorrect code.");
+                    statusText.textContent = "Access Denied";
+                    statusText.style.color = "red";
+                }
+            } else {
+                // UNLOCKED STATE (NORMAL AI)
+                processAI(input);
+            }
+        }
+
+        function unlockSystem() {
+            isUnlocked = true;
+            document.body.classList.add('unlocked');
+            orb.classList.remove('locked-pulse');
+            
+            statusText.textContent = "Access Granted";
+            statusText.style.color = "var(--speaking-color)";
+            instruction.textContent = "System Online";
+
+            speak("Access granted. System online. Welcome, Hadi.");
+        }
+
+        function speak(text) {
+            if (synth.speaking) synth.cancel();
+
+            const utterThis = new SpeechSynthesisUtterance(text);
+            utterThis.volume = 1;
+            utterThis.rate = 1;
+            utterThis.pitch = 1;
+
+            // Select best voice
+            const preferredVoice = voices.find(v => v.name.includes("Google US English")) ||
+                                   voices.find(v => v.name.includes("Samantha")) ||
+                                   voices.find(v => v.name.includes("Microsoft David")) ||
+                                   voices[0];
+            if (preferredVoice) utterThis.voice = preferredVoice;
+
+            utterThis.onstart = () => {
+                orb.classList.add('speaking');
+                instruction.textContent = "AI Speaking...";
+            };
+
+            utterThis.onend = () => {
+                orb.classList.remove('speaking');
+                if(!isUnlocked) {
+                     orb.classList.add('locked-pulse');
+                     statusText.textContent = "System Locked";
+                     statusText.style.color = "var(--locked-color)";
+                     instruction.textContent = "Tap orb to retry";
+                } else {
+                     instruction.textContent = "Tap to Speak";
+                }
+            };
+
+            synth.speak(utterThis);
+        }
+
+        function populateVoices() {
+            voices = synth.getVoices();
+        }
+
+        // NORMAL AI LOGIC (AFTER UNLOCK)
+        function processAI(input) {
+            const lowerInput = input.toLowerCase();
+            let response = "";
+
+            if (lowerInput.includes("hello") || lowerInput.includes("hi")) {
+                response = "Hello Hadi, I am at your service.";
+            } 
+            else if (lowerInput.includes("time")) {
+                response = "The current time is " + new Date().toLocaleTimeString();
+            }
+            else if (lowerInput.includes("date")) {
+                response = "Today is " + new Date().toLocaleDateString();
+            }
+            else if (lowerInput.includes("name")) {
+                response = "I am Nexus, your personal AI.";
+            }
+            else if (lowerInput.includes("thank")) {
+                response = "You are welcome.";
+            }
+            else {
+                response = "I heard you say " + input + ". How can I help with that?";
+            }
+
+            statusText.textContent = "Processing...";
+            setTimeout(() => {
+                speak(response);
+            }, 500);
+        }
+
+    </script>
+</body>
+</html>
